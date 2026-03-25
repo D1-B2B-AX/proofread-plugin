@@ -15,7 +15,7 @@ import pdfplumber
 
 # 공통 감지 유틸리티 import
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from detection_utils import detect_text_variants, detect_suspicious_words, detect_suspicious_english, detect_broken_text
+from detection_utils import detect_text_variants, detect_suspicious_words, detect_suspicious_english, detect_broken_text, detect_suspected_spacing
 
 # 브라우저 인쇄 시 자동 삽입되는 머리글/바닥글 패턴 (URL, 날짜, 페이지번호 등)
 BROWSER_HEADER_FOOTER = re.compile(
@@ -146,6 +146,9 @@ def extract_pdf(file_path):
 
     # 텍스트 깨짐 감지
     result["broken_texts"] = detect_broken_text(result["pages"], key="page_number")
+
+    # 띄어쓰기 오류 감지
+    result["suspected_spacing"] = detect_suspected_spacing(result["pages"], key="page_number")
 
     return result
 

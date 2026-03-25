@@ -299,6 +299,175 @@ def detect_suspicious_words(pages_or_slides, key="slide_number"):
     return suspicious
 
 
+def detect_suspected_spacing(pages_or_slides, key="slide_number"):
+    """
+    kiwi.space()를 활용한 띄어쓰기 오류 자동 감지
+
+    원리: 원본 텍스트의 각 어절(공백 기준 단위)을 kiwi.space()로 교정하여
+    띄어쓰기가 달라진 어절만 후보로 플래그.
+
+    오탐 필터링:
+    - 파일 경로 (\, / 포함 텍스트) 제외
+    - SQL 코드 (언더스코어 _ 포함 단어) 제외
+    - 영문 전용 어절 제외 (SQL 키워드, 변수명 등)
+    - 2글자 이하 한글 어절 제외 (인명, 조사 등 오탐 과다)
+    - 숫자+단위 조합 제외 (32회차, 10분내 등 교안 표현)
+    - 교정 결과가 3어절 이상으로 쪼개지는 경우 제외 (과도 분리)
+    """
+    if not _HAS_KIWI:
+        return []
+
+    # 오탐 필터링용 패턴
+    _path_pattern = re.compile(r'[\\\/]')  # 파일 경로
+    _underscore_pattern = re.compile(r'\w+_\w+')  # SQL 코드 (언더스코어)
+    _english_only = re.compile(r'^[A-Za-z0-9_.@:\/\-]+$')  # 영문/숫자/특수문자만
+    _number_unit = re.compile(r'^\d+[가-힣]{1,3}$')  # 숫자+한글 단위 (32회차, 10분내)
+
+    suspected = []
+    seen = set()
+
+    for page in pages_or_slides:
+        page_num = page[key]
+        for item in page["texts"]:
+            text = item["text"].strip()
+
+            # 기본 필터: 짧은 텍스트, 표 데이터, 파일 경로 건너뛰기
+            if len(text) < 5 or text.startswith("[표]"):
+                continue
+            if _path_pattern.search(text) and ('\\' in text or text.count('/') > 1):
+                continue
+
+            # 문장 전체를 kiwi.space()로 교정
+            try:
+                corrected_text = _kiwi.space(text)
+            except Exception:
+                continue
+
+            if corrected_text == text:
+                continue
+
+            # 공백 제거 후 글자가 다르면 순수 띄어쓰기 차이가 아님 → 건너뛰기
+            if text.replace(" ", "") != corrected_text.replace(" ", ""):
+                continue
+
+            # 원본과 교정본의 어절을 비교하여 차이나는 부분만 추출
+            orig_words = text.split()
+            corr_words = corrected_text.split()
+
+            # 글자 단위로 매핑: 원본 각 어절이 교정본에서 어떻게 바뀌었는지 추적
+            _diffs = _extract_word_diffs(text, corrected_text)
+
+            for orig_chunk, corr_chunk in _diffs:
+                # 필터: 영문 전용 어절
+                if _english_only.match(orig_chunk):
+                    continue
+                # 필터: 언더스코어 포함 (SQL 코드)
+                if _underscore_pattern.search(orig_chunk):
+                    continue
+                # 필터: 한글 3자 미만
+                korean_chars = re.findall(r'[가-힣]', orig_chunk)
+                if len(korean_chars) < 3:
+                    continue
+                # 필터: 숫자+단위
+                if _number_unit.match(orig_chunk):
+                    continue
+                # 필터: 교정 결과가 4어절 이상 (과도 분리)
+                corr_parts = corr_chunk.split()
+                if len(corr_parts) >= 4:
+                    continue
+
+                # 중복 방지
+                diff_key = f"{orig_chunk}→{corr_chunk}"
+                if diff_key in seen:
+                    continue
+                seen.add(diff_key)
+
+                suspected.append({
+                    "page": page_num,
+                    "position": item.get("position", "중"),
+                    "original": orig_chunk,
+                    "corrected": corr_chunk,
+                    "context": text,
+                    "reason": f"띄어쓰기 교정: '{orig_chunk}' → '{corr_chunk}'"
+                })
+
+    return suspected
+
+
+def _extract_word_diffs(original, corrected):
+    """
+    원본과 교정본의 어절 차이를 추출.
+    글자 단위로 매핑하여, 원본의 어떤 어절이 교정에서 분리/병합되었는지 찾음.
+    반환: [(원본 조각, 교정 조각), ...] — 차이가 있는 부분만
+    """
+    diffs = []
+
+    # 공백 제거한 글자열이 같아야 함 (순수 띄어쓰기 차이만)
+    orig_no_space = original.replace(" ", "")
+    corr_no_space = corrected.replace(" ", "")
+    if orig_no_space != corr_no_space:
+        return diffs
+
+    # 각 글자가 원본에서 몇 번째 어절에 속하는지 매핑
+    orig_words = original.split()
+    corr_words = corrected.split()
+
+    # 글자→어절 인덱스 매핑
+    def char_to_word_map(words):
+        mapping = []
+        for wi, word in enumerate(words):
+            for ch in word:
+                mapping.append(wi)
+        return mapping
+
+    orig_map = char_to_word_map(orig_words)
+    corr_map = char_to_word_map(corr_words)
+
+    if len(orig_map) != len(corr_map):
+        return diffs
+
+    # 원본 어절 인덱스별로 교정 어절 인덱스 집합 수집
+    # 원본 어절 i가 교정에서 여러 어절에 걸치면 → 분리됨
+    from collections import defaultdict
+    orig_to_corr = defaultdict(set)
+    for ci in range(len(orig_map)):
+        orig_to_corr[orig_map[ci]].add(corr_map[ci])
+
+    # 차이가 있는 원본 어절 찾기 (교정 어절이 2개 이상에 걸치는 경우)
+    visited_corr = set()
+    i = 0
+    while i < len(orig_words):
+        corr_indices = orig_to_corr[i]
+        if len(corr_indices) == 1 and list(corr_indices)[0] not in visited_corr:
+            ci = list(corr_indices)[0]
+            if orig_words[i] == corr_words[ci]:
+                visited_corr.add(ci)
+                i += 1
+                continue
+
+        # 차이 발생 — 연속된 원본 어절이 같은 교정 어절 그룹에 속하는지 확인
+        all_corr = set()
+        j = i
+        while j < len(orig_words):
+            all_corr.update(orig_to_corr[j])
+            # 다음 원본 어절의 교정 인덱스가 현재 그룹과 겹치면 계속
+            if j + 1 < len(orig_words) and orig_to_corr[j + 1] & all_corr:
+                j += 1
+            else:
+                break
+
+        orig_chunk = " ".join(orig_words[i:j + 1])
+        corr_chunk = " ".join(corr_words[min(all_corr):max(all_corr) + 1])
+
+        if orig_chunk != corr_chunk:
+            diffs.append((orig_chunk, corr_chunk))
+
+        visited_corr.update(all_corr)
+        i = j + 1
+
+    return diffs
+
+
 def detect_suspicious_english(pages_or_slides, key="slide_number"):
     """
     영문 스펠체커로 사전에 없는 영어 단어를 감지

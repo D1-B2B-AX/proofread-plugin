@@ -17,7 +17,7 @@ from pptx.enum.shapes import MSO_SHAPE_TYPE
 
 # 공통 감지 유틸리티 import
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from detection_utils import detect_text_variants, detect_suspicious_words, detect_suspicious_english, detect_broken_text
+from detection_utils import detect_text_variants, detect_suspicious_words, detect_suspicious_english, detect_broken_text, detect_suspected_spacing
 
 # 슬라이드 번호 자리표시자 패턴 (‹#›, <#>, <<#>> 등)
 SLIDE_NUMBER_PATTERN = re.compile(r'^[‹<«\[]*#[›>\»\]]*$')
@@ -120,6 +120,9 @@ def extract_pptx(file_path):
 
     # 텍스트 깨짐 감지
     result["broken_texts"] = detect_broken_text(result["slides"], key="slide_number")
+
+    # 띄어쓰기 오류 감지
+    result["suspected_spacing"] = detect_suspected_spacing(result["slides"], key="slide_number")
 
     return result
 

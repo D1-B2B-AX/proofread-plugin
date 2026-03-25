@@ -69,9 +69,26 @@ def generate_html(review_data, output_path=None):
         os.makedirs(temp_dir, exist_ok=True)
         output_path = os.path.join(temp_dir, f"검수결과_{safe_name}_{date_str}.html")
 
-    errors = review_data.get("errors", [])
-    warnings = review_data.get("warnings", [])
-    notes = review_data.get("notes", [])
+    def _page_sort_key(item):
+        """페이지 번호 오름차순 정렬 키 (p.3 → 3, p.12 → 12)"""
+        import re as _re
+        nums = _re.findall(r'\d+', str(item.get("page", "0")))
+        return int(nums[0]) if nums else 0
+
+    # 분류 고정 규칙 강제 적용: 오류 확정에 들어오면 안 되는 유형을 자동 이동
+    _must_be_warning = {"개인정보(이메일)", "개인정보(전화번호)", "이메일", "전화번호"}
+    raw_errors = review_data.get("errors", [])
+    raw_warnings = review_data.get("warnings", [])
+    fixed_errors = []
+    for item in raw_errors:
+        if item.get("type", "") in _must_be_warning:
+            raw_warnings.append(item)  # 확인 필요로 이동
+        else:
+            fixed_errors.append(item)
+
+    errors = sorted(fixed_errors, key=_page_sort_key)
+    warnings = sorted(raw_warnings, key=_page_sort_key)
+    notes = sorted(review_data.get("notes", []), key=_page_sort_key)
 
     error_count = len(errors)
     warning_count = len(warnings)
@@ -87,7 +104,7 @@ def generate_html(review_data, output_path=None):
 
     # 교안 형태별 안내 문구
     type_notice = {
-        "ppt": "페이지 번호는 PPT 왼쪽 슬라이드 목록 순서와 동일합니다. (PPT 교안 기준)",
+        "ppt": "페이지 번호는 PPT 왼쪽 슬라이드 목록 순서와 동일합니다. (PPT 교안 기준) 간혹 슬라이드 번호가 0부터 시작하는 PPT의 경우, 표시된 페이지와 1p 차이가 날 수 있습니다.",
         "pdf": "페이지 번호는 PDF 뷰어 페이지 번호와 동일합니다. PDF 특성상 띄어쓰기가 누락될 수 있으며, 이는 원본 오류가 아닙니다.",
         "notion": "텍스트 직접 입력이므로 위치 정보는 제공되지 않습니다.",
         "text": "텍스트 직접 입력이므로 위치 정보는 제공되지 않습니다."
@@ -108,10 +125,35 @@ def generate_html(review_data, output_path=None):
 
         error_rows += f"""      <tr class="row-error"><td>{i}</td><td class="page-num">{item.get("page", "-")}</td><td>{escape_html(item.get("type", ""))}</td><td>{safe_html(item.get("original", ""))}</td><td>{safe_html(item.get("suggestion", ""))}</td><td>{sev_html}</td><td>{escape_html(item.get("location", ""))}</td></tr>\n"""
 
-    # 확인 필요 테이블 행
+    # 확인 필요 테이블 행 (심각도 포함, 상→중→하→없음 순 정렬 후 페이지순)
+    sev_order = {"상": 0, "중": 1, "하": 2}
+    warnings_sorted = sorted(warnings, key=lambda x: (sev_order.get(x.get("severity", ""), 3), _page_sort_key(x)))
     warning_rows = ""
-    for i, item in enumerate(warnings, 1):
-        warning_rows += f"""      <tr class="row-om"><td>{i}</td><td class="page-num">{item.get("page", "-")}</td><td>{escape_html(item.get("type", ""))}</td><td>{safe_html(item.get("original", ""))}</td><td>{safe_html(item.get("suggestion", ""))}</td><td>{escape_html(item.get("location", ""))}</td></tr>\n"""
+    last_was_high = False
+    for i, item in enumerate(warnings_sorted, 1):
+        sev = item.get("severity", "")
+        is_high = (sev == "상")
+
+        # 심각도 "상" → 일반으로 전환되는 지점에 구분선 삽입
+        if last_was_high and not is_high:
+            col_count = 7
+            warning_rows += f"""      <tr class="row-om-divider">{"<td></td>" * col_count}</tr>\n"""
+
+        if is_high:
+            sev_html = '<span class="severity-high">상</span>'
+            row_class = "row-om-high"
+        elif sev == "중":
+            sev_html = '<span class="severity-mid">중</span>'
+            row_class = "row-om"
+        elif sev == "하":
+            sev_html = '<span class="severity-low">하</span>'
+            row_class = "row-om"
+        else:
+            sev_html = '<span class="severity-low">-</span>'
+            row_class = "row-om"
+
+        warning_rows += f"""      <tr class="{row_class}"><td>{i}</td><td class="page-num">{item.get("page", "-")}</td><td>{escape_html(item.get("type", ""))}</td><td>{safe_html(item.get("original", ""))}</td><td>{safe_html(item.get("suggestion", ""))}</td><td>{sev_html}</td><td>{escape_html(item.get("location", ""))}</td></tr>\n"""
+        last_was_high = is_high
 
     # 참고사항 테이블 행
     note_rows = ""
@@ -137,7 +179,7 @@ def generate_html(review_data, output_path=None):
         warning_section = f"""  <div class="section-om">
     <div class="section-title">확인 필요</div>
     <table>
-      <tr><th>#</th><th>페이지</th><th>유형</th><th>발견 내용</th><th>확인 포인트</th><th>위치</th></tr>
+      <tr><th>#</th><th>페이지</th><th>유형</th><th>발견 내용</th><th>확인 포인트</th><th>심각도</th><th>위치</th></tr>
 {warning_rows}    </table>
   </div>"""
     else:
@@ -154,8 +196,9 @@ def generate_html(review_data, output_path=None):
     else:
         note_section = ""
 
-    # 메일 섹션 (오류 확정 1건 이상일 때만)
-    if error_count > 0:
+    # 메일 섹션 (오류 확정 1건 이상 또는 확인 필요(상) 1건 이상일 때)
+    warning_high_count = sum(1 for w in warnings_sorted if w.get("severity") == "상")
+    if error_count > 0 or warning_high_count > 0:
         mail_subject = review_data.get("mail_subject", f"{client}_{course} 교안 확인 요청드립니다")
         mail_body = review_data.get("mail_body", "")
         mail_section = f"""  <div class="mail-section">
@@ -217,6 +260,9 @@ def generate_html(review_data, output_path=None):
   .page-num {{ color: #13299f; font-weight: 600; }}
   .row-error td:first-child {{ border-left: 3px solid #d32f2f; }}
   .row-om td:first-child {{ border-left: 3px solid #e67700; }}
+  .row-om-high td:first-child {{ border-left: 3px solid #e67700; }}
+  .row-om-divider td {{ border-bottom: 1px solid #ccc; border-right: none; padding: 0; height: 4px; }}
+  .row-om-divider td:first-child {{ border-left: 3px solid transparent; }}
   .row-ref td:first-child {{ border-left: 3px solid #ccc; }}
   h1 .divider {{ color: rgba(255,255,255,0.4); font-weight: 300; margin: 0 6px; }}
   .note {{ background: #eef2ff; border-radius: 6px; padding: 12px 16px; font-size: 13px; color: #13299f; margin-bottom: 20px; }}
