@@ -82,7 +82,7 @@ git clone https://github.com/D1-B2B-AX/proofread-plugin.git ~/.claude/commands/p
 | 형식 | 확장자 | 비고 |
 |------|--------|------|
 | PowerPoint | `.pptx` | 가장 정확한 추출 |
-| PDF | `.pdf` | 이미지 위주 페이지가 30% 이상이면 OCR로 텍스트 판독 시도 |
+| PDF | `.pdf` | 이미지 위주 페이지가 30% 이상이면 OCR로 텍스트 판독 시도. **PPT와 PDF 둘 다 있다면 PPT가 더 정확합니다** |
 | 노션 | 직접 붙여넣기 또는 PDF 저장 | 아래 3번 참고 |
 
 ---
@@ -199,7 +199,7 @@ git clone https://github.com/D1-B2B-AX/proofread-plugin.git ~/.claude/commands/p
 | 고객사/과정명 | 입력한 고객사명·과정명과 교안 내 표기 불일치 |
 | 강사명 | 다른 강사명 잔존 (이전 교안 재활용 시) |
 | 개인정보 | 전화번호, 이메일, 주민번호 등 민감정보 노출 |
-| 문맥 검수 | 주술 호응, 용어 일관성, 문장 완결성, 앞뒤 모순 |
+| 문맥 검수 | 주술 호응, 용어 일관성, 문장 완결성, 순서/단계 패턴 대조, 앞뒤 모순 |
 
 ---
 
