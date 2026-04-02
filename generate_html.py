@@ -63,6 +63,11 @@ def generate_html(review_data, output_path=None):
     Returns:
         str: 생성된 HTML 파일 경로
     """
+    # om_name 필수 체크 — 이름 없이 검수 결과 생성 불가
+    om_name_val = review_data.get("om_name", "")
+    if not om_name_val or om_name_val == "OOO":
+        raise ValueError("검수자 이름(om_name)이 입력되지 않았습니다. 사용자에게 검수자 이름을 먼저 입력받은 후 다시 실행해 주세요.")
+
     if output_path is None:
         date_str = datetime.now().strftime("%Y%m%d")
         safe_name = review_data.get("file_name", "교안").replace(".pptx", "").replace(".pdf", "").replace(".md", "")
