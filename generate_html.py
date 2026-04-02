@@ -66,7 +66,7 @@ def generate_html(review_data, output_path=None):
     # om_name 필수 체크 — 이름 없이 검수 결과 생성 불가
     om_name_val = review_data.get("om_name", "")
     if not om_name_val or om_name_val == "OOO":
-        raise ValueError("검수자 이름(om_name)이 입력되지 않았습니다. 사용자에게 검수자 이름을 먼저 입력받은 후 다시 실행해 주세요.")
+        raise ValueError("om_name_required: Please ask the user for their name first. Example prompt: 'Reviewer name is needed for the mail signature. Please enter your name. (e.g. Hong Gildong)'")
 
     if output_path is None:
         date_str = datetime.now().strftime("%Y%m%d")
