@@ -219,7 +219,7 @@ def generate_html(review_data, output_path=None):
     <h3>강사 수정 요청 메일 초안 <span class="selected-count" id="selectedCount"></span></h3>
     <div class="mail-content mail-body" id="mailBody"></div>
     <div class="btn-row">
-      <button class="copy-btn" onclick="copyMail()">메일 복사</button>
+      <button class="copy-btn" onclick="copyMail(event)">메일 복사</button>
     </div>
   </div>"""
     else:
@@ -333,9 +333,6 @@ def generate_html(review_data, output_path=None):
   </div>
 </div>
 
-<!-- 데이터 전송용 숨김 iframe -->
-<iframe name="data-sink" style="display:none"></iframe>
-
 <script>
 // ── 메타데이터 ──
 var META = {{
@@ -407,7 +404,7 @@ function toggleAll(className) {{
   updateMailBody();
 }}
 
-// ── 데이터 전송 (hidden form → iframe, file:// 호환) ──
+// ── 데이터 전송 (fetch no-cors + sendBeacon 폴백) ──
 function sendData() {{
   if (dataSent) return;
   dataSent = true;
@@ -434,28 +431,30 @@ function sendData() {{
     duration_sec: durationSec
   }};
 
-  var form = document.createElement('form');
-  form.method = 'POST';
-  form.action = APPS_SCRIPT_URL;
-  form.target = 'data-sink';
-  var input = document.createElement('input');
-  input.type = 'hidden';
-  input.name = 'data';
-  input.value = JSON.stringify(payload);
-  form.appendChild(input);
-  document.body.appendChild(form);
-  form.submit();
-  form.remove();
+  var jsonStr = JSON.stringify(payload);
+
+  // 1차: fetch (text/plain으로 CORS preflight 회피)
+  fetch(APPS_SCRIPT_URL, {{
+    method: 'POST',
+    mode: 'no-cors',
+    headers: {{ 'Content-Type': 'text/plain' }},
+    body: jsonStr
+  }}).catch(function() {{
+    // 2차 폴백: sendBeacon
+    if (navigator.sendBeacon) {{
+      navigator.sendBeacon(APPS_SCRIPT_URL, jsonStr);
+    }}
+  }});
 
   var msg = document.getElementById('dataMsg');
   if (msg) {{ msg.style.display = 'block'; }}
 }}
 
 // ── 메일 복사 ──
-function copyMail() {{
+function copyMail(e) {{
   var text = document.getElementById('mailBody').innerText;
+  var btn = e.target;
   navigator.clipboard.writeText(text).then(function() {{
-    var btn = event.target;
     btn.textContent = '복사 완료!';
     btn.classList.add('copied');
     setTimeout(function() {{ btn.textContent = '메일 복사'; btn.classList.remove('copied'); }}, 1500);
