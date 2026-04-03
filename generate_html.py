@@ -295,6 +295,17 @@ def generate_html(review_data, output_path=None):
   .select-ctrl:hover {{ background: #e0e0e0; }}
   .selected-count {{ font-size: 13px; font-weight: 600; color: #13299f; }}
   .data-msg {{ font-size: 11px; color: #4caf50; margin-top: 6px; display: none; }}
+  /* ── 이름 입력 모달 ── */
+  .modal-overlay {{ position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.35); display: none; justify-content: center; align-items: center; z-index: 1000; }}
+  .modal-box {{ background: #fff; border-radius: 10px; padding: 28px 32px; width: 340px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); }}
+  .modal-title {{ font-size: 15px; font-weight: 600; color: #333; margin-bottom: 16px; }}
+  .modal-input {{ width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; font-family: inherit; outline: none; }}
+  .modal-input:focus {{ border-color: #13299f; }}
+  .modal-btns {{ display: flex; gap: 8px; margin-top: 16px; justify-content: flex-end; }}
+  .modal-confirm {{ padding: 8px 20px; background: #13299f; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-family: inherit; }}
+  .modal-confirm:hover {{ background: #0e1f7a; }}
+  .modal-cancel {{ padding: 8px 16px; background: #f0f0f0; color: #666; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-family: inherit; }}
+  .modal-cancel:hover {{ background: #e0e0e0; }}
   @media (max-width: 768px) {{
     body {{ padding: 10px; }}
     .header-area {{ padding: 24px 20px 20px; }}
@@ -334,7 +345,19 @@ def generate_html(review_data, output_path=None):
 {note_section}
 
 {mail_section}
-  <div class="data-msg" id="dataMsg">데이터가 전송되었습니다.</div>
+  <div class="data-msg" id="dataMsg"></div>
+  </div>
+</div>
+
+<!-- 이름 입력 모달 -->
+<div class="modal-overlay" id="nameModal">
+  <div class="modal-box">
+    <div class="modal-title" id="modalTitle">발신자로 기입될 이름을 입력해주세요</div>
+    <input type="text" class="modal-input" id="nameInput" placeholder="예: 홍길동">
+    <div class="modal-btns">
+      <button class="modal-cancel" onclick="cancelName()">취소</button>
+      <button class="modal-confirm" onclick="confirmName()">확인</button>
+    </div>
   </div>
 </div>
 
@@ -359,6 +382,8 @@ var META = {{
 var APPS_SCRIPT_URL = "{APPS_SCRIPT_URL}";
 var PAGE_LOAD_TIME = Date.now();
 var dataSent = false;
+var nameConfirmed = false;
+var cancelCount = 0;
 
 // ── 메일 본문 동적 생성 ──
 function updateMailBody() {{
@@ -451,14 +476,77 @@ function sendData() {{
     }}
   }});
 
-  var msg = document.getElementById('dataMsg');
-  if (msg) {{ msg.style.display = 'block'; }}
+  // 데이터 전송 완료 (UI 표시 없음)
+}}
+
+// ── 이름 모달 ──
+function showNameModal() {{
+  var modal = document.getElementById('nameModal');
+  var input = document.getElementById('nameInput');
+  var title = document.getElementById('modalTitle');
+  cancelCount = 0;
+
+  if (!nameConfirmed) {{
+    title.textContent = '발신자로 기입될 이름을 입력해주세요';
+    input.value = '';
+    input.placeholder = '예: 홍길동';
+  }} else {{
+    title.textContent = '발신자: ' + META.omName;
+    input.value = META.omName;
+    input.placeholder = '';
+  }}
+  modal.style.display = 'flex';
+  input.focus();
+  input.select();
+}}
+
+function confirmName() {{
+  var input = document.getElementById('nameInput');
+  var val = input.value.trim();
+  if (!val) {{
+    handleEmptyName();
+    return;
+  }}
+  META.omName = val;
+  nameConfirmed = true;
+  cancelCount = 0;
+  dataSent = false;
+  closeNameModal();
+  updateMailBody();
+  doCopyMail();
+}}
+
+function handleEmptyName() {{
+  cancelCount++;
+  if (cancelCount >= 2) {{
+    META.omName = '미입력';
+    nameConfirmed = true;
+    dataSent = false;
+    closeNameModal();
+    updateMailBody();
+    doCopyMail();
+  }} else {{
+    document.getElementById('modalTitle').textContent = '이름 없이 진행하면 미입력으로 기록됩니다';
+    document.getElementById('nameInput').focus();
+  }}
+}}
+
+function cancelName() {{
+  handleEmptyName();
+}}
+
+function closeNameModal() {{
+  document.getElementById('nameModal').style.display = 'none';
 }}
 
 // ── 메일 복사 ──
 function copyMail(e) {{
+  showNameModal();
+}}
+
+function doCopyMail() {{
   var text = document.getElementById('mailBody').innerText;
-  var btn = e.target;
+  var btn = document.querySelector('.copy-btn');
   navigator.clipboard.writeText(text).then(function() {{
     btn.textContent = '복사 완료!';
     btn.classList.add('copied');
@@ -473,6 +561,9 @@ document.addEventListener('DOMContentLoaded', function() {{
     cb.addEventListener('change', updateMailBody);
   }});
   updateMailBody();
+  document.getElementById('nameInput').addEventListener('keydown', function(e) {{
+    if (e.key === 'Enter') confirmName();
+  }});
 }});
 </script>
 </body>
