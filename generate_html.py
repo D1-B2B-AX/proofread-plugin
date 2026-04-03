@@ -584,6 +584,20 @@ document.addEventListener('DOMContentLoaded', function() {{
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(html)
 
+    # 검수 완료 후 안내 메시지 (코드 강제 출력)
+    print(f"\nHTML 생성 완료: {output_path}")
+    print()
+    print("📋 결과 확인")
+    print("- 결과 페이지는 브라우저에서 바로 확인할 수 있어요.")
+    print("- 메일 복사는 결과 페이지 하단 \"메일 복사\" 버튼을 이용해 주세요.")
+    print()
+    print("🔄 추가 작업")
+    print("- 다른 교안 검수: /교안검수를 다시 입력")
+    print("- 강사 수정본 확인: \"2차 검수\"라고 입력")
+    print()
+    print("🚪 종료")
+    print("- 결과 확인이 끝났으면 이 대화창은 닫아도 됩니다.")
+
     return output_path
 
 
