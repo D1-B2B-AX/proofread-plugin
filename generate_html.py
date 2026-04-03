@@ -63,10 +63,9 @@ def generate_html(review_data, output_path=None):
     Returns:
         str: 생성된 HTML 파일 경로
     """
-    # om_name 필수 체크 — 이름 없이 검수 결과 생성 불가
-    om_name_val = review_data.get("om_name", "")
-    if not om_name_val or om_name_val == "OOO":
-        raise ValueError("om_name_required: Please ask the user for their name first. Example prompt: 'Reviewer name is needed for the mail signature. Please enter your name. (e.g. Hong Gildong)'")
+    # om_name: HTML 모달에서 입력받으므로 기본값 허용
+    if not review_data.get("om_name"):
+        review_data["om_name"] = ""
 
     if output_path is None:
         date_str = datetime.now().strftime("%Y%m%d")
