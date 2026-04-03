@@ -377,7 +377,7 @@ def generate_html(review_data, output_path=None):
 <div class="container">
   <div class="header-area">
   <h1>「{course}」<span class="divider">|</span><span style="color: #01b1e3;">교안 검수 결과</span></h1>
-  <p class="subtitle">{client} &middot; {instructor} 강사 &middot; {review_date} 검수 &middot; {om_name}</p>
+  <p class="subtitle">{client} &middot; {instructor} 강사 &middot; {review_date} 검수 &middot; <span id="subtitleName">{om_name}</span></p>
 
   <div class="info-box">
     <span>파일:</span> <b>{file_name}{pages_display}</b><br>
@@ -574,6 +574,8 @@ function confirmName() {{
   nameConfirmed = true;
   cancelCount = 0;
   dataSent = false;
+  var sn = document.getElementById('subtitleName');
+  if (sn) sn.textContent = val;
   closeNameModal();
   updateMailBody();
   doCopyMail();
@@ -585,6 +587,8 @@ function handleEmptyName() {{
     META.omName = '미입력';
     nameConfirmed = true;
     dataSent = false;
+    var sn2 = document.getElementById('subtitleName');
+    if (sn2) sn2.textContent = '미입력';
     closeNameModal();
     updateMailBody();
     doCopyMail();
