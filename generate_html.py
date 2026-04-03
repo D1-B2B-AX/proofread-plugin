@@ -207,15 +207,24 @@ def generate_html(review_data, output_path=None):
         elif sev == "중":
             sev_html = '<span class="severity-mid">중</span>'
             row_class = "row-om"
-            cb_html = '<td class="cb-cell"></td>'
+            cb_page = escape_html(item.get("page", "-"))
+            cb_orig = escape_html(strip_tags(item.get("original", "")))
+            cb_sugg = escape_html(strip_tags(item.get("suggestion", "")))
+            cb_html = f'<td class="cb-cell"><input type="checkbox" class="item-check warning-other-check" data-page="{cb_page}" data-original="{cb_orig}" data-suggestion="{cb_sugg}"></td>'
         elif sev == "하":
             sev_html = '<span class="severity-low">하</span>'
             row_class = "row-om"
-            cb_html = '<td class="cb-cell"></td>'
+            cb_page = escape_html(item.get("page", "-"))
+            cb_orig = escape_html(strip_tags(item.get("original", "")))
+            cb_sugg = escape_html(strip_tags(item.get("suggestion", "")))
+            cb_html = f'<td class="cb-cell"><input type="checkbox" class="item-check warning-other-check" data-page="{cb_page}" data-original="{cb_orig}" data-suggestion="{cb_sugg}"></td>'
         else:
             sev_html = '<span class="severity-low">-</span>'
             row_class = "row-om"
-            cb_html = '<td class="cb-cell"></td>'
+            cb_page = escape_html(item.get("page", "-"))
+            cb_orig = escape_html(strip_tags(item.get("original", "")))
+            cb_sugg = escape_html(strip_tags(item.get("suggestion", "")))
+            cb_html = f'<td class="cb-cell"><input type="checkbox" class="item-check warning-other-check" data-page="{cb_page}" data-original="{cb_orig}" data-suggestion="{cb_sugg}"></td>'
 
         # 볼드/하이라이트 자동 처리
         hl_orig, hl_sugg = auto_highlight(item.get("original", ""), item.get("suggestion", ""))
@@ -223,11 +232,14 @@ def generate_html(review_data, output_path=None):
         warning_rows += f"""      <tr class="{row_class}">{cb_html}<td>{i}</td><td class="page-num">{item.get("page", "-")}</td><td>{escape_html(item.get("type", ""))}</td><td>{safe_html(hl_orig)}</td><td>{safe_html(hl_sugg)}</td><td>{sev_html}</td><td>{escape_html(item.get("location", ""))}</td></tr>\n"""
         last_was_high = is_high
 
-    # ── 참고사항 테이블 행 (체크박스 없음) ──
+    # ── 참고사항 테이블 행 (체크박스 기본 해제) ──
     note_rows = ""
     for i, item in enumerate(notes, 1):
         hl_orig, hl_sugg = auto_highlight(item.get("original", ""), item.get("suggestion", ""))
-        note_rows += f"""      <tr class="row-ref"><td>{i}</td><td class="page-num">{item.get("page", "-")}</td><td>{escape_html(item.get("type", ""))}</td><td>{safe_html(hl_orig)}</td><td>{safe_html(hl_sugg)}</td><td>{escape_html(item.get("note", ""))}</td></tr>\n"""
+        cb_page = escape_html(item.get("page", "-"))
+        cb_orig = escape_html(strip_tags(item.get("original", "")))
+        cb_sugg = escape_html(strip_tags(item.get("suggestion", "")))
+        note_rows += f"""      <tr class="row-ref"><td class="cb-cell"><input type="checkbox" class="item-check note-check" data-page="{cb_page}" data-original="{cb_orig}" data-suggestion="{cb_sugg}"></td><td>{i}</td><td class="page-num">{item.get("page", "-")}</td><td>{escape_html(item.get("type", ""))}</td><td>{safe_html(hl_orig)}</td><td>{safe_html(hl_sugg)}</td><td>{escape_html(item.get("note", ""))}</td></tr>\n"""
 
     # ── 오류 확정 섹션 ──
     if error_count > 0:
@@ -260,7 +272,7 @@ def generate_html(review_data, output_path=None):
         note_section = f"""  <div class="section-ref">
     <div class="section-title">참고사항</div>
     <table>
-      <tr><th>#</th><th>페이지</th><th>유형</th><th>현재 표기</th><th>권장 표기</th><th>비고</th></tr>
+      <tr><th class="cb-header"></th><th>#</th><th>페이지</th><th>유형</th><th>현재 표기</th><th>권장 표기</th><th>비고</th></tr>
 {note_rows}    </table>
   </div>"""
     else:
