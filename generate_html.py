@@ -67,6 +67,17 @@ def generate_html(review_data, output_path=None):
     if not review_data.get("om_name"):
         review_data["om_name"] = ""
 
+    # total_pages: 추출 스크립트가 저장한 임시 파일에서 보정
+    import tempfile
+    if not review_data.get("total_pages"):
+        page_count_path = os.path.join(tempfile.gettempdir(), "proofread_page_count.txt")
+        if os.path.exists(page_count_path):
+            with open(page_count_path, "r") as f:
+                try:
+                    review_data["total_pages"] = int(f.read().strip())
+                except ValueError:
+                    pass
+
     if output_path is None:
         date_str = datetime.now().strftime("%Y%m%d")
         safe_name = review_data.get("file_name", "교안").replace(".pptx", "").replace(".pdf", "").replace(".md", "")

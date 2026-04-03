@@ -124,6 +124,12 @@ def extract_pptx(file_path):
     # 띄어쓰기 오류 감지
     result["suspected_spacing"] = detect_suspected_spacing(result["slides"], key="slide_number")
 
+    # 페이지 수를 임시 파일로 저장 (generate_html.py에서 읽어감)
+    import tempfile
+    page_count_path = os.path.join(tempfile.gettempdir(), "proofread_page_count.txt")
+    with open(page_count_path, "w") as f:
+        f.write(str(result["total_slides"]))
+
     return result
 
 
