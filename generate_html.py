@@ -39,6 +39,38 @@ def strip_tags(text):
     return re.sub(r'<[^>]+>', '', str(text))
 
 
+def auto_highlight(original, suggestion):
+    """original/suggestion에 태그가 없으면 글자 diff로 자동 추가"""
+    if not original or not suggestion:
+        return original or "", suggestion or ""
+
+    orig_plain = strip_tags(str(original))
+    sugg_plain = strip_tags(str(suggestion))
+
+    # 이미 태그가 있으면 그대로 반환
+    if "<span" in str(original) or "<b>" in str(suggestion):
+        return original, suggestion
+
+    import difflib
+    sm = difflib.SequenceMatcher(None, orig_plain, sugg_plain)
+    orig_parts = []
+    sugg_parts = []
+
+    for op, i1, i2, j1, j2 in sm.get_opcodes():
+        if op == "equal":
+            orig_parts.append(escape_html(orig_plain[i1:i2]))
+            sugg_parts.append(escape_html(sugg_plain[j1:j2]))
+        elif op == "replace":
+            orig_parts.append(f'<span class="highlight">{escape_html(orig_plain[i1:i2])}</span>')
+            sugg_parts.append(f'<b>{escape_html(sugg_plain[j1:j2])}</b>')
+        elif op == "delete":
+            orig_parts.append(f'<span class="highlight">{escape_html(orig_plain[i1:i2])}</span>')
+        elif op == "insert":
+            sugg_parts.append(f'<b>{escape_html(sugg_plain[j1:j2])}</b>')
+
+    return "".join(orig_parts), "".join(sugg_parts)
+
+
 def generate_html(review_data, output_path=None):
     """
     검수 결과 데이터를 HTML로 변환
@@ -145,11 +177,14 @@ def generate_html(review_data, output_path=None):
         else:
             sev_html = '<span class="severity-low">하</span>'
 
+        # 볼드/하이라이트 자동 처리
+        hl_orig, hl_sugg = auto_highlight(item.get("original", ""), item.get("suggestion", ""))
+
         cb_page = escape_html(item.get("page", "-"))
         cb_orig = escape_html(strip_tags(item.get("original", "")))
         cb_sugg = escape_html(strip_tags(item.get("suggestion", "")))
 
-        error_rows += f"""      <tr class="row-error"><td class="cb-cell"><input type="checkbox" class="item-check error-check" checked data-page="{cb_page}" data-original="{cb_orig}" data-suggestion="{cb_sugg}"></td><td>{i}</td><td class="page-num">{item.get("page", "-")}</td><td>{escape_html(item.get("type", ""))}</td><td>{safe_html(item.get("original", ""))}</td><td>{safe_html(item.get("suggestion", ""))}</td><td>{sev_html}</td><td>{escape_html(item.get("location", ""))}</td></tr>\n"""
+        error_rows += f"""      <tr class="row-error"><td class="cb-cell"><input type="checkbox" class="item-check error-check" checked data-page="{cb_page}" data-original="{cb_orig}" data-suggestion="{cb_sugg}"></td><td>{i}</td><td class="page-num">{item.get("page", "-")}</td><td>{escape_html(item.get("type", ""))}</td><td>{safe_html(hl_orig)}</td><td>{safe_html(hl_sugg)}</td><td>{sev_html}</td><td>{escape_html(item.get("location", ""))}</td></tr>\n"""
 
     # ── 확인 필요 테이블 행 (심각도 "상"만 체크박스) ──
     warning_rows = ""
@@ -182,13 +217,17 @@ def generate_html(review_data, output_path=None):
             row_class = "row-om"
             cb_html = '<td class="cb-cell"></td>'
 
-        warning_rows += f"""      <tr class="{row_class}">{cb_html}<td>{i}</td><td class="page-num">{item.get("page", "-")}</td><td>{escape_html(item.get("type", ""))}</td><td>{safe_html(item.get("original", ""))}</td><td>{safe_html(item.get("suggestion", ""))}</td><td>{sev_html}</td><td>{escape_html(item.get("location", ""))}</td></tr>\n"""
+        # 볼드/하이라이트 자동 처리
+        hl_orig, hl_sugg = auto_highlight(item.get("original", ""), item.get("suggestion", ""))
+
+        warning_rows += f"""      <tr class="{row_class}">{cb_html}<td>{i}</td><td class="page-num">{item.get("page", "-")}</td><td>{escape_html(item.get("type", ""))}</td><td>{safe_html(hl_orig)}</td><td>{safe_html(hl_sugg)}</td><td>{sev_html}</td><td>{escape_html(item.get("location", ""))}</td></tr>\n"""
         last_was_high = is_high
 
     # ── 참고사항 테이블 행 (체크박스 없음) ──
     note_rows = ""
     for i, item in enumerate(notes, 1):
-        note_rows += f"""      <tr class="row-ref"><td>{i}</td><td class="page-num">{item.get("page", "-")}</td><td>{escape_html(item.get("type", ""))}</td><td>{safe_html(item.get("original", ""))}</td><td>{safe_html(item.get("suggestion", ""))}</td><td>{escape_html(item.get("note", ""))}</td></tr>\n"""
+        hl_orig, hl_sugg = auto_highlight(item.get("original", ""), item.get("suggestion", ""))
+        note_rows += f"""      <tr class="row-ref"><td>{i}</td><td class="page-num">{item.get("page", "-")}</td><td>{escape_html(item.get("type", ""))}</td><td>{safe_html(hl_orig)}</td><td>{safe_html(hl_sugg)}</td><td>{escape_html(item.get("note", ""))}</td></tr>\n"""
 
     # ── 오류 확정 섹션 ──
     if error_count > 0:
