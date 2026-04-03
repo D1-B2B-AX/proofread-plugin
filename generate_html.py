@@ -95,9 +95,9 @@ def generate_html(review_data, output_path=None):
     Returns:
         str: 생성된 HTML 파일 경로
     """
-    # om_name: HTML 모달에서 입력받으므로 기본값 허용
+    # om_name: HTML 모달에서 입력받으므로 기본값 "OOO" (메일 미리보기용)
     if not review_data.get("om_name"):
-        review_data["om_name"] = ""
+        review_data["om_name"] = "OOO"
 
     # total_pages: 추출 스크립트가 저장한 임시 파일에서 보정
     import tempfile
