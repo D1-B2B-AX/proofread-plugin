@@ -355,6 +355,13 @@ def generate_html(review_data, output_path=None):
   .modal-confirm:hover {{ background: #0e1f7a; }}
   .modal-cancel {{ padding: 8px 16px; background: #f0f0f0; color: #666; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-family: inherit; }}
   .modal-cancel:hover {{ background: #e0e0e0; }}
+  /* ── 검수 완료 안내 ── */
+  .guide-section {{ background: #f8f9fa; border: 1px solid #e8e8e8; border-radius: 8px; padding: 20px 24px; margin-top: 30px; }}
+  .guide-title {{ font-size: 14px; font-weight: 600; color: #666; margin-bottom: 14px; }}
+  .guide-row {{ display: flex; gap: 10px; margin-bottom: 10px; font-size: 13px; color: #555; line-height: 1.7; }}
+  .guide-row:last-child {{ margin-bottom: 0; }}
+  .guide-icon {{ font-size: 16px; flex-shrink: 0; margin-top: 1px; }}
+  .guide-row code {{ background: #e9ecef; padding: 1px 6px; border-radius: 3px; font-size: 12px; }}
   @media (max-width: 768px) {{
     body {{ padding: 10px; }}
     .header-area {{ padding: 24px 20px 20px; }}
@@ -395,6 +402,13 @@ def generate_html(review_data, output_path=None):
 
 {mail_section}
   <div class="data-msg" id="dataMsg"></div>
+
+  <div class="guide-section">
+    <div class="guide-title">검수 완료 후 안내</div>
+    <div class="guide-row"><span class="guide-icon">📋</span><div><b>결과 확인</b><br>메일 복사는 위 "메일 복사" 버튼을 이용해 주세요.</div></div>
+    <div class="guide-row"><span class="guide-icon">🔄</span><div><b>추가 작업</b><br>다른 교안 검수: 대화창에서 <code>/교안검수</code> 입력<br>강사 수정본 확인: <code>2차 검수</code>라고 입력</div></div>
+    <div class="guide-row"><span class="guide-icon">🚪</span><div><b>종료</b><br>결과 확인이 끝나면 대화창은 닫아도 됩니다.</div></div>
+  </div>
   </div>
 </div>
 
@@ -623,19 +637,7 @@ document.addEventListener('DOMContentLoaded', function() {{
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(html)
 
-    # 검수 완료 후 안내 메시지 (코드 강제 출력)
-    print(f"\nHTML 생성 완료: {output_path}")
-    print()
-    print("📋 결과 확인")
-    print("- 결과 페이지는 브라우저에서 바로 확인할 수 있어요.")
-    print("- 메일 복사는 결과 페이지 하단 \"메일 복사\" 버튼을 이용해 주세요.")
-    print()
-    print("🔄 추가 작업")
-    print("- 다른 교안 검수: /교안검수를 다시 입력")
-    print("- 강사 수정본 확인: \"2차 검수\"라고 입력")
-    print()
-    print("🚪 종료")
-    print("- 결과 확인이 끝났으면 이 대화창은 닫아도 됩니다.")
+    # 검수 완료 후 안내 메시지 (HTML 안내 섹션으로 대체 — print 제거)
 
     return output_path
 
