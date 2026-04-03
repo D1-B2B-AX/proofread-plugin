@@ -68,6 +68,57 @@ def extract_text_from_shape(shape, slide_height):
     return items
 
 
+def detect_page_number_order(slides):
+    """슬라이드 하단의 페이지 번호를 추출하여 순서 이상을 감지"""
+    PAGE_NUM_PATTERN = re.compile(r'^\d{1,4}$')
+    page_numbers = []  # [(slide_number, detected_page_num)]
+
+    for slide in slides:
+        slide_num = slide["slide_number"]
+        bottom_numbers = []
+        for item in slide.get("texts", []):
+            if item.get("position") == "하":
+                text = item.get("text", "").strip()
+                if PAGE_NUM_PATTERN.match(text):
+                    bottom_numbers.append(int(text))
+        if bottom_numbers:
+            # 하단에 숫자가 여러 개면 가장 큰 값 (보통 페이지 번호가 가장 큼)
+            page_numbers.append((slide_num, max(bottom_numbers)))
+
+    if len(page_numbers) < 2:
+        return []
+
+    issues = []
+    for i in range(1, len(page_numbers)):
+        prev_slide, prev_num = page_numbers[i - 1]
+        curr_slide, curr_num = page_numbers[i]
+        diff = curr_num - prev_num
+
+        if diff == 1:
+            continue  # 정상
+        elif diff == 0:
+            issues.append({
+                "type": "페이지 번호 중복",
+                "slide": curr_slide,
+                "detail": f"슬라이드 {prev_slide}과 {curr_slide} 모두 페이지 번호 {curr_num}"
+            })
+        elif diff > 1:
+            missing = [str(prev_num + j) for j in range(1, diff)]
+            issues.append({
+                "type": "페이지 번호 누락",
+                "slide": curr_slide,
+                "detail": f"슬라이드 {prev_slide}({prev_num}) → {curr_slide}({curr_num}), {','.join(missing)} 누락"
+            })
+        elif diff < 0:
+            issues.append({
+                "type": "페이지 번호 역전",
+                "slide": curr_slide,
+                "detail": f"슬라이드 {prev_slide}({prev_num}) → {curr_slide}({curr_num}), 순서 역전"
+            })
+
+    return issues
+
+
 def extract_pptx(file_path):
     """
     PPTX 파일에서 슬라이드별 텍스트를 추출
@@ -123,6 +174,9 @@ def extract_pptx(file_path):
 
     # 띄어쓰기 오류 감지
     result["suspected_spacing"] = detect_suspected_spacing(result["slides"], key="slide_number")
+
+    # 페이지 번호 순서 검증
+    result["page_number_issues"] = detect_page_number_order(result["slides"])
 
     # 페이지 수를 임시 파일로 저장 (generate_html.py에서 읽어감)
     import tempfile

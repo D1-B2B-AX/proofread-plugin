@@ -36,6 +36,56 @@ def get_position_label(y_top, page_height):
         return "하"
 
 
+def detect_page_number_order(pages):
+    """페이지 하단의 페이지 번호를 추출하여 순서 이상을 감지"""
+    PAGE_NUM_PATTERN = re.compile(r'^\d{1,4}$')
+    page_numbers = []  # [(page_number, detected_num)]
+
+    for page in pages:
+        page_num = page["page_number"]
+        bottom_numbers = []
+        for item in page.get("texts", []):
+            if item.get("position") == "하":
+                text = item.get("text", "").strip()
+                if PAGE_NUM_PATTERN.match(text):
+                    bottom_numbers.append(int(text))
+        if bottom_numbers:
+            page_numbers.append((page_num, max(bottom_numbers)))
+
+    if len(page_numbers) < 2:
+        return []
+
+    issues = []
+    for i in range(1, len(page_numbers)):
+        prev_page, prev_num = page_numbers[i - 1]
+        curr_page, curr_num = page_numbers[i]
+        diff = curr_num - prev_num
+
+        if diff == 1:
+            continue
+        elif diff == 0:
+            issues.append({
+                "type": "페이지 번호 중복",
+                "page": curr_page,
+                "detail": f"페이지 {prev_page}과 {curr_page} 모두 번호 {curr_num}"
+            })
+        elif diff > 1:
+            missing = [str(prev_num + j) for j in range(1, diff)]
+            issues.append({
+                "type": "페이지 번호 누락",
+                "page": curr_page,
+                "detail": f"페이지 {prev_page}({prev_num}) → {curr_page}({curr_num}), {','.join(missing)} 누락"
+            })
+        elif diff < 0:
+            issues.append({
+                "type": "페이지 번호 역전",
+                "page": curr_page,
+                "detail": f"페이지 {prev_page}({prev_num}) → {curr_page}({curr_num}), 순서 역전"
+            })
+
+    return issues
+
+
 def extract_pdf(file_path):
     """
     PDF 파일에서 페이지별 텍스트를 추출
@@ -149,6 +199,9 @@ def extract_pdf(file_path):
 
     # 띄어쓰기 오류 감지
     result["suspected_spacing"] = detect_suspected_spacing(result["pages"], key="page_number")
+
+    # 페이지 번호 순서 검증
+    result["page_number_issues"] = detect_page_number_order(result["pages"])
 
     # 페이지 수를 임시 파일로 저장 (generate_html.py에서 읽어감)
     import tempfile
