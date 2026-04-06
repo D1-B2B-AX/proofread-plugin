@@ -71,6 +71,8 @@ def extract_text_from_shape(shape, slide_height):
 def detect_page_number_order(slides):
     """슬라이드 하단의 페이지 번호를 추출하여 순서 이상을 감지"""
     PAGE_NUM_PATTERN = re.compile(r'^\d{1,4}$')
+    total_slides = len(slides)
+    max_valid = int(total_slides * 1.5) + 5
     page_numbers = []  # [(slide_number, detected_page_num)]
 
     for slide in slides:
@@ -80,12 +82,15 @@ def detect_page_number_order(slides):
             if item.get("position") == "하":
                 text = item.get("text", "").strip()
                 if PAGE_NUM_PATTERN.match(text):
-                    bottom_numbers.append(int(text))
+                    num = int(text)
+                    if num <= max_valid:
+                        bottom_numbers.append(num)
         if bottom_numbers:
-            # 하단에 숫자가 여러 개면 가장 큰 값 (보통 페이지 번호가 가장 큼)
             page_numbers.append((slide_num, max(bottom_numbers)))
 
-    if len(page_numbers) < 2:
+    if len(page_numbers) == 0:
+        return [{"type": "안내", "slide": "-", "detail": "이 교안에는 하단 페이지 번호가 감지되지 않았습니다."}]
+    if len(page_numbers) == 1:
         return []
 
     issues = []
@@ -96,6 +101,8 @@ def detect_page_number_order(slides):
 
         if diff == 1:
             continue  # 정상
+        elif diff > 1 and diff == curr_slide - prev_slide:
+            continue  # 번호 갭 == 슬라이드 갭 → 중간에 소제목/구분 슬라이드 (정상)
         elif diff == 0:
             issues.append({
                 "type": "페이지 번호 중복",
@@ -103,11 +110,18 @@ def detect_page_number_order(slides):
                 "detail": f"슬라이드 {prev_slide}과 {curr_slide} 모두 페이지 번호 {curr_num}"
             })
         elif diff > 1:
-            missing = [str(prev_num + j) for j in range(1, diff)]
+            first_missing = prev_num + 1
+            last_missing = curr_num - 1
+            count = diff - 1
+            if count <= 10:
+                missing = [str(prev_num + j) for j in range(1, diff)]
+                detail = f"슬라이드 {prev_slide}({prev_num}) → {curr_slide}({curr_num}), {','.join(missing)} 누락"
+            else:
+                detail = f"슬라이드 {prev_slide}({prev_num}) → {curr_slide}({curr_num}), {first_missing}~{last_missing} 누락 ({count}개)"
             issues.append({
                 "type": "페이지 번호 누락",
                 "slide": curr_slide,
-                "detail": f"슬라이드 {prev_slide}({prev_num}) → {curr_slide}({curr_num}), {','.join(missing)} 누락"
+                "detail": detail
             })
         elif diff < 0:
             issues.append({
