@@ -156,6 +156,8 @@ def generate_html(review_data, output_path=None):
     file_type = review_data.get("file_type", "ppt")
     review_date = datetime.now().strftime("%Y-%m-%d")
     page_count_js = total_pages if total_pages else 0
+    manual_estimate_min_js = review_data.get("manual_estimate_min", 0) or 0
+    plugin_duration_sec_js = review_data.get("plugin_duration_sec", 0) or 0
 
     type_notice = {
         "ppt": "페이지 번호는 PPT 왼쪽 슬라이드 목록 순서와 동일합니다. (PPT 교안 기준) 간혹 슬라이드 번호가 0부터 시작하는 PPT의 경우, 표시된 페이지와 1p 차이가 날 수 있습니다.",
@@ -279,8 +281,8 @@ def generate_html(review_data, output_path=None):
         note_section = ""
 
     # ── 메일 섹션 (체크박스 기반 동적 구성) ──
+    mail_subject = review_data.get("mail_subject", f"{client}_{course} 교안 확인 요청드립니다")
     if error_count > 0 or warning_high_count > 0:
-        mail_subject = review_data.get("mail_subject", f"{client}_{course} 교안 확인 요청드립니다")
         mail_section = f"""  <div class="mail-section">
     <h3>강사 수정 요청 메일 초안 <span class="selected-count" id="selectedCount"></span></h3>
     <div class="mail-content mail-body" id="mailBody"></div>
@@ -451,7 +453,9 @@ var META = {{
   foundConfirmed: {error_count},
   foundReview: {warning_count},
   foundReference: {note_count},
-  selectableCount: {selectable_count}
+  selectableCount: {selectable_count},
+  manualEstimateMin: {manual_estimate_min_js},
+  pluginDurationSec: {plugin_duration_sec_js}
 }};
 
 var APPS_SCRIPT_URL = "{APPS_SCRIPT_URL}";
@@ -533,7 +537,9 @@ function sendData() {{
     selectable_count: META.selectableCount,
     om_selected: selected,
     mail_copied: true,
-    duration_sec: durationSec
+    duration_sec: durationSec,
+    manual_estimate_min: META.manualEstimateMin,
+    plugin_duration_sec: META.pluginDurationSec
   }};
 
   var jsonStr = JSON.stringify(payload);
